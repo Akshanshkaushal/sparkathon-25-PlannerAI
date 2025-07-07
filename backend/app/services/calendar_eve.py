@@ -25,7 +25,7 @@ app.config['SESSION_PERMANENT'] = False
 Session(app)
 
 # Google OAuth setup
-CLIENT_SECRETS_FILE = "client_secret.json"
+CLIENT_SECRETS_FILE = "client_secret.json" #create your google calendar api and download json and save it as client_secret.json
 SCOPES = ['https://www.googleapis.com/auth/calendar.readonly']
 REDIRECT_URI = 'https://localhost:5000/oauth2callback'
 

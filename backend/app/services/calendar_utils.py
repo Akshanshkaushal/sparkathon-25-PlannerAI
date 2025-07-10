@@ -1,26 +1,54 @@
-# calendar_utils.py
-
-from googleapiclient.discovery import build
+import os
+import datetime
+from pymongo import MongoClient
 from google.oauth2.credentials import Credentials
-from datetime import datetime, timedelta
+from googleapiclient.discovery import build
+from credential_store import get_user_credentials
 
-def get_events(credentials_dict, days_ahead=5):
-    creds = Credentials(**credentials_dict)
-    service = build('calendar', 'v3', credentials=creds)
+def get_events(email):
+    creds_dict = get_user_credentials(email)
+    if not creds_dict:
+        print(f"⚠️ No credentials found for {email}")
+        return
 
-    # Target date is X days ahead from today (UTC)
-    target_date = datetime.utcnow() + timedelta(days=days_ahead)
+    credentials = Credentials(
+        token=creds_dict['token'],
+        refresh_token=creds_dict.get('refresh_token'),
+        token_uri=creds_dict['token_uri'],
+        client_id=creds_dict['client_id'],
+        client_secret=creds_dict['client_secret'],
+        scopes=creds_dict['scopes']
+    )
 
-    # Define start and end of that day in ISO format
-    time_min = target_date.replace(hour=0, minute=0, second=0).isoformat() + 'Z'
-    time_max = target_date.replace(hour=23, minute=59, second=59).isoformat() + 'Z'
+    service = build('calendar', 'v3', credentials=credentials)
 
-    result = service.events().list(
-        calendarId='primary',
-        timeMin=time_min,
-        timeMax=time_max,
-        singleEvents=True,
-        orderBy='startTime'
-    ).execute()
+    now = datetime.datetime.utcnow().isoformat() + 'Z'
+    time_max = (datetime.datetime.utcnow() + datetime.timedelta(days=5)).isoformat() + 'Z'
 
-    return result.get('items', [])
+    try:
+        events_result = service.events().list(
+            calendarId='primary',
+            timeMin=now,
+            timeMax=time_max,
+            maxResults=50,
+            singleEvents=True,
+            orderBy='startTime'
+        ).execute()
+        events = events_result.get('items', [])
+    except Exception as e:
+        print(f"❌ Error fetching events for {email}: {e}")
+        return
+
+    client = MongoClient(os.getenv("MONGO_URI"))
+    db = client.get_database()
+
+    db.parsed_events.delete_many({"email": email})
+
+    for event in events:
+        event['email'] = email
+
+    if events:
+        db.parsed_events.insert_many(events)
+        print(f"✅ Inserted {len(events)} events for {email}")
+    else:
+        print(f"ℹ️ No upcoming events found for {email}")

@@ -1,12 +1,15 @@
-# event_cache.py
+from flask import Flask, request, jsonify
+from pymongo import MongoClient
+import os
 
-event_cache = {}
+app = Flask(__name__)
 
-def update_user_events(email, events):
-    event_cache[email] = events
+# MongoDB connection
+client = MongoClient(os.environ['MONGO_URI'])
+db = client.get_database()
+parsed_events_collection = db['parsed_events']
 
-def get_cached_events(email):
-    return event_cache.get(email, [])
-
-def get_all_cached():
-    return event_cache
+@app.route('/api/scheduled/<email>')
+def get_scheduled_events(email):
+    events = list(parsed_events_collection.find({'email': email}, {'_id': 0}).sort('timestamp', 1))
+    return jsonify(events)

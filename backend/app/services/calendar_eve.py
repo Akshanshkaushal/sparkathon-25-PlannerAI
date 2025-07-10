@@ -1,47 +1,58 @@
-from flask import Flask, redirect, session, url_for, request, jsonify
+# calendar_eve.py (in app/services)
+from flask import Flask, redirect, session, url_for, request, jsonify, render_template
 from flask_session import Session
 from google_auth_oauthlib.flow import Flow
+from credential_store import store_user_credentials
 from calendar_utils import get_events
-from credential_store import store_user_credentials, get_user_credentials
 from scheduler import start_scheduler
-from event_cache import get_cached_events
+from dotenv import load_dotenv
+from tempfile import gettempdir
 import os
 
+# 🔧 Load environment variables
+print("\U0001F527 Loading environment variables...")
+load_dotenv()
+
 app = Flask(__name__)
+app.secret_key = os.getenv("SECRET_KEY") or "dev"
+print("\U0001F511 Secret key set:", app.secret_key[:5] + "...")
 
-# Fixed dev key for consistent session behavior
-app.secret_key = b'super-dev-key'
-
-# Secure session cookies for cross-site Google OAuth redirects
-app.config.update(
-    SESSION_COOKIE_SECURE=True,
-    SESSION_COOKIE_SAMESITE="None",
-    SESSION_COOKIE_HTTPONLY=True
-)
-
-# Flask session config
+# ✅ Session configuration
 app.config['SESSION_TYPE'] = 'filesystem'
-app.config['SESSION_PERMANENT'] = False
+app.config['SESSION_FILE_DIR'] = os.path.join(gettempdir(), 'flask_session')
+app.config['SESSION_COOKIE_SECURE'] = False
 Session(app)
+print(f"\u2705 Flask session initialized using {app.config['SESSION_FILE_DIR']}")
 
-# Google OAuth setup
+# 🔐 Google OAuth config
 CLIENT_SECRETS_FILE = "client_secret.json"
 SCOPES = ['https://www.googleapis.com/auth/calendar.readonly']
 REDIRECT_URI = 'https://localhost:5000/oauth2callback'
+print("🔗 OAuth config - Redirect URI:", REDIRECT_URI)
 
+def credentials_to_dict(creds):
+    print("🔐 Converting credentials to dict...")
+    return {
+        'token': creds.token,
+        'refresh_token': creds.refresh_token,
+        'token_uri': creds.token_uri,
+        'client_id': creds.client_id,
+        'client_secret': creds.client_secret,
+        'scopes': creds.scopes
+    }
 
 @app.route('/')
-def index():
-    return jsonify({"message": "Send POST to /authorize with 'email' in form-data"})
-
+def home():
+    print("🌐 GET / - Rendering homepage")
+    return render_template("index.html")
 
 @app.route('/authorize', methods=['POST'])
 def authorize():
-    email = request.form.get('email')
+    email = request.form.get("email")
     if not email:
         return jsonify({"error": "Email required"}), 400
-
     session['email'] = email
+    print("📨 Received email:", email)
 
     flow = Flow.from_client_secrets_file(
         CLIENT_SECRETS_FILE,
@@ -53,56 +64,49 @@ def authorize():
         include_granted_scopes='true'
     )
     session['state'] = state
-    return jsonify({"auth_url": auth_url})
-
+    print("🔑 Session state stored:", state)
+    print("\u27a1\ufe0f Redirecting to Google OAuth URL:", auth_url)
+    return redirect(auth_url)
 
 @app.route('/oauth2callback')
 def oauth2callback():
-    if 'state' not in session or 'email' not in session:
-        return jsonify({"error": "Session expired. Start again from /authorize"}), 400
+    try:
+        print("🔙 Received callback from Google with URL:", request.url)
+        state = session.get('state')
+        print("🔍 Retrieved session state:", state)
+        if not state:
+            return '❌ Missing session state. Cannot validate OAuth flow.', 400
 
-    returned_state = request.args.get("state")
-    if returned_state != session['state']:
-        return jsonify({"error": "CSRF Warning: state mismatch"}), 400
+        flow = Flow.from_client_secrets_file(
+            CLIENT_SECRETS_FILE,
+            scopes=SCOPES,
+            redirect_uri=REDIRECT_URI
+        )
+        flow.fetch_token(authorization_response=request.url)
 
-    flow = Flow.from_client_secrets_file(
-        CLIENT_SECRETS_FILE,
-        scopes=SCOPES,
-        state=session['state'],
-        redirect_uri=REDIRECT_URI
-    )
-    flow.fetch_token(authorization_response=request.url)
-    credentials = flow.credentials
+        credentials = flow.credentials
+        email = session.get('email')
+        if not email:
+            return "Missing email in session", 400
 
-    store_user_credentials(session['email'], {
-        'token': credentials.token,
-        'refresh_token': credentials.refresh_token,
-        'token_uri': credentials.token_uri,
-        'client_id': credentials.client_id,
-        'client_secret': credentials.client_secret,
-        'scopes': credentials.scopes
-    })
+        store_user_credentials(email, credentials_to_dict(credentials))
+        get_events(email)
+        print(f"✅ OAuth success! Credentials stored and events fetched for {email}")
+        return redirect(url_for('home'))
 
-    return jsonify({"message": f"Credentials stored for {session['email']}"})
-
-
-@app.route('/api/events/<email>')
-def api_events(email):
-    credentials = get_user_credentials(email)
-    if not credentials:
-        return jsonify({'error': 'Not connected'}), 404
-
-    events = get_events(credentials, days_ahead=5)
-    return jsonify(events)
-
+    except Exception as e:
+        print(f"❌ OAuth error during callback: {e}")
+        return f"OAuth Error: {e}", 400
 
 @app.route('/api/scheduled/<email>')
-def get_scheduled_events(email):
-    events = get_cached_events(email)
+def show_events(email):
+    from pymongo import MongoClient
+    client = MongoClient(os.getenv("MONGO_URI"))
+    db = client.get_database()
+    events = list(db.parsed_events.find({"email": email}, {"_id": 0}))
     return jsonify(events)
 
-
-# ✅ Expose app for use in run.py
 def create_calendar_app():
+    print("🚀 Starting calendar app...")
     start_scheduler()
     return app

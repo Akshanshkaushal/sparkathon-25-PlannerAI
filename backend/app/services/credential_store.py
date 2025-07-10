@@ -1,29 +1,25 @@
-# credential_store.py
-
-import json
+from pymongo import MongoClient
 import os
 
-CREDENTIALS_FILE = 'user_credentials.json'
+def get_db():
+    from dotenv import load_dotenv
+    load_dotenv()
+    client = MongoClient(os.getenv("MONGO_URI"))
+    return client.get_database()
 
-
-def load_credentials():
-    if os.path.exists(CREDENTIALS_FILE):
-        with open(CREDENTIALS_FILE, 'r') as f:
-            return json.load(f)
-    return {}
-
-
-def save_credentials(credentials_dict):
-    with open(CREDENTIALS_FILE, 'w') as f:
-        json.dump(credentials_dict, f)
-
+def store_user_credentials(email, creds_dict):
+    db = get_db()
+    db.user_credentials.update_one(
+        {"email": email},
+        {"$set": {"credentials": creds_dict}},
+        upsert=True
+    )
 
 def get_user_credentials(email):
-    all_credentials = load_credentials()
-    return all_credentials.get(email)
+    db = get_db()
+    record = db.user_credentials.find_one({"email": email})
+    return record["credentials"] if record else None
 
-
-def store_user_credentials(email, credentials):
-    all_credentials = load_credentials()
-    all_credentials[email] = credentials
-    save_credentials(all_credentials)
+def get_all_users():
+    db = get_db()
+    return [doc["email"] for doc in db.user_credentials.find()]

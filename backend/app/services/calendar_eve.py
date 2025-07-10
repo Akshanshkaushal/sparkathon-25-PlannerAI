@@ -1,13 +1,13 @@
-# calendar_eve.py (in app/services)
 from flask import Flask, redirect, session, url_for, request, jsonify, render_template
 from flask_session import Session
 from google_auth_oauthlib.flow import Flow
-from credential_store import store_user_credentials
-from calendar_utils import get_events
-from scheduler import start_scheduler
+from app.services.credential_store import get_user_credentials, store_user_credentials
+from app.services.calendar_utils import get_events
+from app.services.scheduler import start_scheduler
 from dotenv import load_dotenv
 from tempfile import gettempdir
 import os
+
 
 # 🔧 Load environment variables
 print("\U0001F527 Loading environment variables...")

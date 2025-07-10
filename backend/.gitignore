@@ -1,55 +1,22 @@
-# Python
+# Python cache and compiled files
 __pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-env/
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-*.egg-info/
-.installed.cfg
-*.egg
+*.pyc
 
-# Virtual Environment
-venv/
-ENV/
-env/
+# Environment variables and secrets
 .env
-.venv/
+client_secret.json
 
-# IDE
-.idea/
+# SSL Certificates (never push these!)
+cert.pem
+key.pem
+
+# Virtual environment (if any)
+venv/
+env/
+
+# VSCode settings (optional)
 .vscode/
-*.swp
-*.swo
 
-# Logs
-*.log
-logs/
-
-# OS generated files
+# OS files
 .DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
 Thumbs.db
-
-# Project specific
-instance/
-.webassets-cache
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local

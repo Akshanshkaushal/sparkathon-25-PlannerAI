@@ -1,6 +1,6 @@
 from apscheduler.schedulers.background import BackgroundScheduler
-from credential_store import get_all_users
-from calendar_utils import get_events
+from app.services.credential_store import get_all_users
+from app.services.calendar_utils import get_events
 
 def scheduled_job():
     print("🕒 Running scheduled event fetch...")

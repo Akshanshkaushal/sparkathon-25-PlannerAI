@@ -3,7 +3,7 @@ import datetime
 from pymongo import MongoClient
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
-from credential_store import get_user_credentials
+from app.services.credential_store import get_user_credentials
 
 def get_events(email):
     creds_dict = get_user_credentials(email)

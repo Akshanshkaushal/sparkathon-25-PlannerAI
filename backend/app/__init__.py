@@ -35,5 +35,5 @@ def create_app():
     scheduler.start()
 
     app.register_blueprint(api_bp, url_prefix='/api')
-
+#
     return app

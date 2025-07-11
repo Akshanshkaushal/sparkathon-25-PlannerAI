@@ -70,3 +70,50 @@ class DBService:
 
 # Singleton
 db_service = DBService()
+
+# Add the missing functions that are imported in routes.py
+def get_user_preferences(user_name):
+    """
+    Retrieve user preferences from the database.
+    
+    Args:
+        user_name: The name of the user whose preferences to retrieve.
+        
+    Returns:
+        A dictionary of user preferences or empty dict if none found.
+    """
+    try:
+        db = db_service.db
+        user_prefs = db.user_preferences.find_one({"user_name": user_name})
+        if user_prefs:
+            return user_prefs.get("preferences", {})
+        else:
+            logger.warning(f"No preferences found for user: {user_name}")
+            return {}
+    except Exception as e:
+        logger.error(f"Error retrieving preferences for {user_name}: {e}")
+        return {}
+
+def add_user_preference(user_name, preferences):
+    """
+    Add or update user preferences in the database.
+    
+    Args:
+        user_name: The name of the user to update preferences for.
+        preferences: The preferences data to store.
+        
+    Returns:
+        The result of the database operation.
+    """
+    try:
+        db = db_service.db
+        result = db.user_preferences.update_one(
+            {"user_name": user_name},
+            {"$set": {"preferences": preferences, "updated_at": datetime.utcnow()}},
+            upsert=True
+        )
+        logger.info(f"Updated preferences for user {user_name}")
+        return result
+    except Exception as e:
+        logger.error(f"Error adding preferences for {user_name}: {e}")
+        raise

@@ -6,7 +6,7 @@ import os
 def get_budget_agent_chain():
     llm = AzureChatOpenAI(
         azure_deployment=os.environ.get('AZURE_OPENAI_GPT_DEPLOYMENT_NAME'),
-        api_version="2023-05-15"
+        api_version=os.environ.get('AZURE_OPENAI_GPT_DEPLOYMENT_VERSION')
     )
 
     prompt_template = """

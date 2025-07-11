@@ -1,20 +1,49 @@
 from flask import Blueprint, jsonify, request
 from app.agents.goal_agent import get_goal_agent_chain
 from app.agents.budget_agent import get_budget_agent_chain
-from app.agents.trend_agent import create_trend_agent_executor
+from app.agents.trend_agent import run_trend_ai  # Changed from create_trend_agent_executor
 from app.services.db_service import db_service
 import json
 import logging
+import re
 from datetime import datetime
 
 api_bp = Blueprint('api_bp', __name__)
 logger = logging.getLogger(__name__)
 
+
+def extract_event_name(summary: str) -> str:
+    if "_" in summary:
+        return summary.split("_")[0].lower()
+    return summary.lower()
+
+
+def extract_json_from_text(raw_text: str) -> str:
+    """
+    Extract JSON from text that might be wrapped in markdown fences like ```json ... ```
+    """
+    # remove code block fences
+    code_fence_pattern = r"```(?:json)?\s*(.*?)```"
+    match = re.search(code_fence_pattern, raw_text, re.DOTALL)
+    if match:
+        return match.group(1).strip()
+    return raw_text.strip()
+
+
+def try_parse_json(raw_text, context=""):
+    """
+    Safely attempts to parse JSON string. Cleans fenced code blocks first.
+    """
+    clean_text = extract_json_from_text(raw_text)
+    try:
+        return json.loads(clean_text)
+    except json.JSONDecodeError:
+        logger.error(f"❌ Failed to parse JSON from {context}. Raw cleaned text was:\n{clean_text}")
+        raise
+
+
 @api_bp.route('/user-preferences', methods=['POST'])
 def update_user_preferences():
-    """
-    Update a user's preferences and budget using 'summary' as unique identifier.
-    """
     data = request.json
     summary = data.get('summary')
     preferences = data.get('preferences')
@@ -30,36 +59,36 @@ def update_user_preferences():
         if budget is not None:
             update_data['budget'] = budget
 
-        if not update_data:
-            return jsonify({"error": "No data to update (preferences or budget)."}), 400
+        event_name = extract_event_name(summary)
+        update_data['event_name'] = event_name
+        update_data['last_updated'] = datetime.utcnow().isoformat()
 
         db_service.create_or_update_event_user(summary, update_data)
 
-        return jsonify({"status": "success", "message": f"Preferences for {summary} updated."}), 200
+        return jsonify({
+            "status": "success",
+            "message": f"Preferences for {summary} updated.",
+            "event_name": event_name
+        }), 200
 
     except Exception as e:
         logger.exception(f"Error updating user preferences for {summary}")
         return jsonify({"error": "Internal server error", "details": str(e)}), 500
 
-
 @api_bp.route('/trigger-event', methods=['POST'])
 def trigger_event():
-    """
-    Triggered by a calendar event. Uses 'summary' as unique identifier.
-    """
     data = request.json
     summary = data.get('summary')
     if not summary:
         return jsonify({"error": "Missing 'summary' field."}), 400
 
-    event_name = data.get('event_name', 'General')
+    event_name = extract_event_name(summary)
 
     try:
-        # Fetch existing user data by summary
+        # -------------------- User data --------------------
         user_data = db_service.get_user_by_summary(summary) or {}
-
-        preferences = data.get('preferences') or user_data.get('preferences', ["books", "electronics"])
-        budget = data.get('budget') or user_data.get('budget', "Mid-Range")
+        preferences = data.get('preferences') or user_data.get('preferences', ["books", "gadgets"])
+        budget = data.get('budget') or user_data.get('budget', {"min": 100, "max": 500})
         user_name = data.get('user_name') or user_data.get('user_name', summary.split('@')[0])
 
         update_payload = {
@@ -69,65 +98,41 @@ def trigger_event():
             "event_name": event_name,
             "last_updated": datetime.utcnow().isoformat()
         }
-
         db_service.create_or_update_event_user(summary, update_payload)
 
-        # --- Agent pipeline ---
-
+        # -------------------- Agents --------------------
         goal_chain = get_goal_agent_chain()
         plan_result = goal_chain.invoke({
             "event_type": event_name,
             "person_name": user_name,
             "user_preferences": str(preferences)
         })
-        plan_json = json.loads(plan_result['text'])
-        logger.info(f"🧠 Planner Agent returned: {plan_json}")
+
+        logger.info(f"📝 Planner agent output:\n{plan_result}")
+        plan_json = try_parse_json(plan_result.get('text', ''), context="Planner Agent")
 
         budget_chain = get_budget_agent_chain()
         budget_result = budget_chain.invoke({
             "spending_tier": budget,
             "event_plan_json": json.dumps(plan_json)
         })
-        budget_json = json.loads(budget_result['text'])
-        logger.info(f"💰 Budget Agent returned: {budget_json}")
 
-        trend_agent_executor = create_trend_agent_executor()
+        logger.info(f"💵 Budget agent output:\n{budget_result}")
+        budget_json = try_parse_json(budget_result.get('text', ''), context="Budget Agent")
+
+        # -------------------- Trend shopping --------------------
         cart_items = {}
-        items_to_find = []
 
         for category, items in plan_json.items():
             if not isinstance(items, list):
                 continue
             cart_items[category] = []
-            category_budget = budget_json.get(category, {}).get('max_budget')
 
-            for item in items:
-                item_name = item.get('name') if isinstance(item, dict) else item
-                items_to_find.append({
-                    "category": category,
-                    "item": item_name,
-                    "budget": category_budget
-                })
-
-        for item_info in items_to_find:
-            category = item_info['category']
-            item_description = item_info['item']
-            item_budget = f"up to ${item_info['budget']}" if item_info['budget'] else "any budget"
-            logger.info(f"🛒 Looking for '{item_description}' in '{category}' with {item_budget}")
-            agent_response = trend_agent_executor.invoke({
-                "item_description": item_description,
-                "budget": item_budget
-            })
-            product_json_string = agent_response.get('output', '{}')
-            try:
-                product_details = json.loads(product_json_string)
-                cart_items[category].append(product_details)
-            except json.JSONDecodeError:
-                logger.error(f"❌ Failed to parse product JSON: {product_json_string}")
-                cart_items[category].append({
-                    "source": "Error",
-                    "title": f"Could not find '{item_description}'"
-                })
+            category_budget = budget_json.get(category, {}).get('max_budget', budget['max'])
+            
+            # Run our trend AI to pick best from list
+            best_product = run_trend_ai(items, category_budget, category)
+            cart_items[category].append(best_product)
 
         return jsonify({
             "plan": plan_json,

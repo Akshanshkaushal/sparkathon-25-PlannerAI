@@ -6,7 +6,7 @@ import os
 def get_goal_agent_chain():
     llm = AzureChatOpenAI(
         azure_deployment=os.environ.get('AZURE_OPENAI_GPT_DEPLOYMENT_NAME'),
-        api_version="2023-05-15" # Check your Azure OpenAI Studio for the correct version
+        api_version=os.environ.get('AZURE_OPENAI_GPT_DEPLOYMENT_VERSION') # Check your Azure OpenAI Studio for the correct version
     )
 
     prompt_template = """

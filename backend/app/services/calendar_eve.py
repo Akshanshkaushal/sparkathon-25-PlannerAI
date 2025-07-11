@@ -1,7 +1,7 @@
 from flask import Flask, redirect, session, url_for, request, jsonify, render_template
 from flask_session import Session
 from google_auth_oauthlib.flow import Flow
-from app.services.credential_store import get_user_credentials, store_user_credentials
+from app.services.credential_store import  store_user_credentials
 from app.services.calendar_utils import get_events
 from app.services.scheduler import start_scheduler
 from dotenv import load_dotenv
@@ -102,11 +102,18 @@ def oauth2callback():
 def show_events(email):
     from pymongo import MongoClient
     client = MongoClient(os.getenv("MONGO_URI"))
-    db = client.get_database()
+    db = client["planner_ai"]
     events = list(db.parsed_events.find({"email": email}, {"_id": 0}))
     return jsonify(events)
 
 def create_calendar_app():
     print("🚀 Starting calendar app...")
+    
+    # Register API blueprints
+    from app.api.routes import api_bp
+    app.register_blueprint(api_bp, url_prefix='/api')
+    
+    # Start the scheduler
     start_scheduler()
+    
     return app

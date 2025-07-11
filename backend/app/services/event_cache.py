@@ -6,7 +6,7 @@ app = Flask(__name__)
 
 # MongoDB connection
 client = MongoClient(os.environ['MONGO_URI'])
-db = client.get_database()
+db = client["planner_ai"]
 parsed_events_collection = db['parsed_events']
 
 @app.route('/api/scheduled/<email>')

@@ -40,7 +40,7 @@ def get_events(email):
         return
 
     client = MongoClient(os.getenv("MONGO_URI"))
-    db = client.get_database()
+    db = client["planner_ai"]
 
     db.parsed_events.delete_many({"email": email})
 

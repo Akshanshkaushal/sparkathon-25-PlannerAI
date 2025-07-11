@@ -5,7 +5,7 @@ def get_db():
     from dotenv import load_dotenv
     load_dotenv()
     client = MongoClient(os.getenv("MONGO_URI"))
-    return client.get_database()
+    return client["planner_ai"]
 
 def store_user_credentials(email, creds_dict):
     db = get_db()

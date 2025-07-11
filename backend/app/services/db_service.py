@@ -1,74 +1,72 @@
 import os
-from flask import Flask
-from flask_pymongo import PyMongo
-from pymongo import ASCENDING
-from app.config import Config
+import logging
+from pymongo import MongoClient, ASCENDING
+from pymongo.errors import ConnectionFailure
+from datetime import datetime
 
-app = Flask(__name__)
-app.config["MONGO_URI"] = Config.MONGO_URI
+logger = logging.getLogger(__name__)
 
-# Initialize PyMongo
-db = PyMongo(app)
+class DBService:
+    def __init__(self):
+        try:
+            mongo_uri = os.environ.get("MONGO_URI", "mongodb://localhost:27017/")
+            self.client = MongoClient(mongo_uri)
+            self.client.admin.command('ping')  # Check connection
+            self.db = self.client.get_database("planner_ai")
+            self.parsed_events = self.db.parsed_events
 
-# Ensure collection with unique index on email (and optionally user_name)
-def setup_users_collection():
-    users_collection = db.db.users
-    # Make sure there is a unique index on email
-    users_collection.create_index([("email", ASCENDING)], unique=True)
-    # Optional: also unique on user_name
-    users_collection.create_index([("user_name", ASCENDING)], unique=True)
+            # Ensure unique index on summary (used as unique ID now)
+            indexes = self.parsed_events.index_information()
+            if 'summary_1' not in indexes:
+                self.parsed_events.create_index([("summary", ASCENDING)], unique=True)
 
-# Run once on import
-setup_users_collection()
+            logger.info("✅ Connected to MongoDB and ensured index on summary.")
+        except ConnectionFailure as e:
+            logger.error(f"❌ Could not connect to MongoDB: {e}")
+            raise
+        except Exception as e:
+            logger.error(f"❌ Initialization error: {e}")
+            raise
 
-# CRUD Functions
-def create_or_update_user(user_name, email, preferences=None, spending_tier=None):
-    """
-    Creates a new user or updates existing user by email.
-    """
-    update_fields = {
-        "user_name": user_name,
-        "email": email
-    }
-    if preferences is not None:
-        update_fields["preferences"] = preferences
-    if spending_tier is not None:
-        update_fields["spending_tier"] = spending_tier
+    def create_or_update_event_user(self, summary: str, data_to_update: dict):
+        if not summary:
+            raise ValueError("Summary (used as ID) is required.")
 
-    db.db.users.update_one(
-        {"email": email},
-        {"$set": update_fields},
-        upsert=True
-    )
+        # Always update summary field
+        data_to_update["summary"] = summary
+        data_to_update["last_updated"] = datetime.utcnow().isoformat()
 
-def get_user_preferences(email):
-    user = db.db.users.find_one({"email": email})
-    return user.get("preferences", []) if user else []
+        try:
+            result = self.parsed_events.update_one(
+                {"summary": summary},
+                {"$set": data_to_update, "$setOnInsert": {"created_at": datetime.utcnow()}},
+                upsert=True
+            )
+            if result.upserted_id:
+                logger.info(f"✅ Created new document for summary: {summary}")
+            elif result.modified_count > 0:
+                logger.info(f"✅ Updated existing document for summary: {summary}")
+            else:
+                logger.info(f"ℹ️ No changes made for summary: {summary}")
+            return result
+        except Exception as e:
+            logger.error(f"❌ Failed to update document for summary: {summary}, Error: {e}")
+            raise
 
-# Add this function to match the import in routes.py
-def get_user_preferences_by_email(email):
-    """Alias for get_user_preferences for backward compatibility"""
-    return get_user_preferences(email)
+    def get_user_by_summary(self, summary: str):
+        try:
+            return self.parsed_events.find_one({"summary": summary})
+        except Exception as e:
+            logger.error(f"❌ Could not fetch user by summary {summary}: {e}")
+            raise
 
-def update_user_preferences(email, preferences):
-    db.db.users.update_one(
-        {"email": email},
-        {"$set": {"preferences": preferences}},
-        upsert=True
-    )
+    def list_all_summaries(self):
+        try:
+            cursor = self.parsed_events.find({}, {"summary": 1, "_id": 0})
+            return [doc.get("summary") for doc in cursor]
+        except Exception as e:
+            logger.error("❌ Failed to list summaries")
+            return []
 
-def get_user_spending_tier(email):
-    user = db.db.users.find_one({"email": email})
-    return user.get("spending_tier") if user else None
-
-# Add this function to match the import in routes.py
-def get_user_spending_tier_by_email(email):
-    """Alias for get_user_spending_tier for backward compatibility"""
-    return get_user_spending_tier(email)
-
-def update_user_spending_tier(email, spending_tier):
-    db.db.users.update_one(
-        {"email": email},
-        {"$set": {"spending_tier": spending_tier}},
-        upsert=True
-    )
+# Singleton
+db_service = DBService()

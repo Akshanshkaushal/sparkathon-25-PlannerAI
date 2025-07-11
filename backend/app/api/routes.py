@@ -1,144 +1,140 @@
 from flask import Blueprint, jsonify, request
-from app.services.db_service import (
-    get_user_preferences_by_email,
-    get_user_spending_tier_by_email,
-    create_or_update_user
-)
 from app.agents.goal_agent import get_goal_agent_chain
 from app.agents.budget_agent import get_budget_agent_chain
 from app.agents.trend_agent import create_trend_agent_executor
+from app.services.db_service import db_service
 import json
 import logging
+from datetime import datetime
 
 api_bp = Blueprint('api_bp', __name__)
 logger = logging.getLogger(__name__)
 
-@api_bp.route('/trigger-event', methods=['POST'])
-def trigger_event():
+@api_bp.route('/user-preferences', methods=['POST'])
+def update_user_preferences():
+    """
+    Update a user's preferences and budget using 'summary' as unique identifier.
+    """
     data = request.json
-    event_type = data.get('event_type')
-    email = data.get('email')
-    user_name = data.get('user_name')
+    summary = data.get('summary')
+    preferences = data.get('preferences')
+    budget = data.get('budget')
 
-    if not email:
-        return jsonify({"error": "Email is required as unique user identifier."}), 400
+    if not summary:
+        return jsonify({"error": "The 'summary' field is required."}), 400
 
     try:
-        # 1. Resolve preferences
-        preferences = data.get('preferences')
-        if not preferences:
-            preferences = get_user_preferences_by_email(email)
-            if not preferences:
-                preferences = ["books", "electronics"]
-                logger.info(f"No preferences found for {email}, using defaults: {preferences}")
+        update_data = {}
+        if preferences is not None:
+            update_data['preferences'] = preferences
+        if budget is not None:
+            update_data['budget'] = budget
 
-        # 2. Resolve spending tier
-        spending_tier = data.get('spending_tier')
-        if not spending_tier:
-            spending_tier = get_user_spending_tier_by_email(email)
-            if not spending_tier:
-                spending_tier = "Mid-Range"
-                logger.info(f"No spending tier found for {email}, using default: {spending_tier}")
+        if not update_data:
+            return jsonify({"error": "No data to update (preferences or budget)."}), 400
 
-        # 3. Save/update user in DB
-        create_or_update_user(
-            user_name=user_name or "Unknown",
-            email=email,
-            preferences=preferences,
-            spending_tier=spending_tier
-        )
+        db_service.create_or_update_event_user(summary, update_data)
 
-        # 4. Run Planner Agent
+        return jsonify({"status": "success", "message": f"Preferences for {summary} updated."}), 200
+
+    except Exception as e:
+        logger.exception(f"Error updating user preferences for {summary}")
+        return jsonify({"error": "Internal server error", "details": str(e)}), 500
+
+
+@api_bp.route('/trigger-event', methods=['POST'])
+def trigger_event():
+    """
+    Triggered by a calendar event. Uses 'summary' as unique identifier.
+    """
+    data = request.json
+    summary = data.get('summary')
+    if not summary:
+        return jsonify({"error": "Missing 'summary' field."}), 400
+
+    event_name = data.get('event_name', 'General')
+
+    try:
+        # Fetch existing user data by summary
+        user_data = db_service.get_user_by_summary(summary) or {}
+
+        preferences = data.get('preferences') or user_data.get('preferences', ["books", "electronics"])
+        budget = data.get('budget') or user_data.get('budget', "Mid-Range")
+        user_name = data.get('user_name') or user_data.get('user_name', summary.split('@')[0])
+
+        update_payload = {
+            "user_name": user_name,
+            "preferences": preferences,
+            "budget": budget,
+            "event_name": event_name,
+            "last_updated": datetime.utcnow().isoformat()
+        }
+
+        db_service.create_or_update_event_user(summary, update_payload)
+
+        # --- Agent pipeline ---
+
         goal_chain = get_goal_agent_chain()
         plan_result = goal_chain.invoke({
-            "event_type": event_type,
-            "person_name": user_name or email,
+            "event_type": event_name,
+            "person_name": user_name,
             "user_preferences": str(preferences)
         })
         plan_json = json.loads(plan_result['text'])
-        logger.info(f"Planner Agent returned: {plan_json}")
+        logger.info(f"🧠 Planner Agent returned: {plan_json}")
 
-        # 5. Run Budget Agent
         budget_chain = get_budget_agent_chain()
         budget_result = budget_chain.invoke({
-            "spending_tier": spending_tier,
+            "spending_tier": budget,
             "event_plan_json": json.dumps(plan_json)
         })
         budget_json = json.loads(budget_result['text'])
-        logger.info(f"Budget Agent returned: {budget_json}")
+        logger.info(f"💰 Budget Agent returned: {budget_json}")
 
-        # 6. Initialize Trend Agent
         trend_agent_executor = create_trend_agent_executor()
-
-        # 7. Build cart dynamically
         cart_items = {}
         items_to_find = []
 
         for category, items in plan_json.items():
             if not isinstance(items, list):
-                continue  # skip non-list fields
+                continue
             cart_items[category] = []
-            budget_for_category = budget_json.get(category, {}).get('max_budget')
+            category_budget = budget_json.get(category, {}).get('max_budget')
+
             for item in items:
                 item_name = item.get('name') if isinstance(item, dict) else item
                 items_to_find.append({
                     "category": category,
                     "item": item_name,
-                    "budget": budget_for_category
+                    "budget": category_budget
                 })
 
-        # 8. Find products for each item using Trend Agent
         for item_info in items_to_find:
             category = item_info['category']
             item_description = item_info['item']
             item_budget = f"up to ${item_info['budget']}" if item_info['budget'] else "any budget"
-
-            logger.info(f"Invoking Trend Agent for '{item_description}' in '{category}' with '{item_budget}'")
-
+            logger.info(f"🛒 Looking for '{item_description}' in '{category}' with {item_budget}")
             agent_response = trend_agent_executor.invoke({
                 "item_description": item_description,
                 "budget": item_budget
             })
-
             product_json_string = agent_response.get('output', '{}')
             try:
                 product_details = json.loads(product_json_string)
                 cart_items[category].append(product_details)
             except json.JSONDecodeError:
-                logger.error(f"Failed to parse Trend Agent JSON: {product_json_string}")
+                logger.error(f"❌ Failed to parse product JSON: {product_json_string}")
                 cart_items[category].append({
                     "source": "Error",
-                    "title": f"Could not find '{item_description}'",
-                    "price": {"currentPrice": "N/A"}
+                    "title": f"Could not find '{item_description}'"
                 })
 
         return jsonify({
             "plan": plan_json,
             "budget": budget_json,
             "cart": cart_items
-        })
+        }), 200
 
     except Exception as e:
-        logger.exception("Unexpected error in /trigger-event.")
-        return jsonify({"error": "Internal server error.", "details": str(e)}), 500
-
-
-@api_bp.route('/user-preferences', methods=['POST'])
-def set_user_preferences():
-    data = request.json
-    email = data.get('email')
-    user_name = data.get('user_name')
-    preferences = data.get('preferences')
-    spending_tier = data.get('spending_tier')
-
-    if not email:
-        return jsonify({"error": "Email is required as unique user identifier."}), 400
-
-    create_or_update_user(
-        user_name=user_name or "Unknown",
-        email=email,
-        preferences=preferences,
-        spending_tier=spending_tier
-    )
-
-    return jsonify({"message": f"Preferences and spending tier for {email} updated."}), 201
+        logger.exception("Error in /trigger-event")
+        return jsonify({"error": "Internal server error", "details": str(e)}), 500

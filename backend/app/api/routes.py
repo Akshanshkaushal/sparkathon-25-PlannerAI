@@ -75,6 +75,7 @@ def update_user_preferences():
         logger.exception(f"Error updating user preferences for {summary}")
         return jsonify({"error": "Internal server error", "details": str(e)}), 500
 
+
 @api_bp.route('/trigger-event', methods=['POST'])
 def trigger_event():
     data = request.json
@@ -120,20 +121,41 @@ def trigger_event():
         logger.info(f"💵 Budget agent output:\n{budget_result}")
         budget_json = try_parse_json(budget_result.get('text', ''), context="Budget Agent")
 
-        # -------------------- Trend shopping --------------------
-        cart_items = {}
+        # -------------------- Trend shopping: build full cart --------------------
+        cart_items = {
+            "decorations": [],
+            "gifts": [],
+            "cake": []
+        }
 
-        for category, items in plan_json.items():
-            if not isinstance(items, list):
-                continue
-            cart_items[category] = []
+        # 🎈 Decorations
+        decoration_budget = budget_json.get("decorations", {}).get("max_budget", budget.get("max"))
+        decoration_items = plan_json.get("decoration_items", [])
+        if decoration_items:
+            best_decor = run_trend_ai(decoration_items, decoration_budget, "decorations")
+            cart_items["decorations"].append(best_decor)
 
-            category_budget = budget_json.get(category, {}).get('max_budget', budget['max'])
-            
-            # Run our trend AI to pick best from list
-            best_product = run_trend_ai(items, category_budget, category)
-            cart_items[category].append(best_product)
+        # 🎁 Gifts
+        gift_budget = budget_json.get("gifts", {}).get("max_budget", budget.get("max"))
+        gift_suggestions = plan_json.get("gift_suggestions", {})
 
+        # combine both inspired_by_gifts and specific_gifts into a flat list
+        gifts_list = []
+        gifts_list += gift_suggestions.get("specific_gifts", [])
+        gifts_list += gift_suggestions.get("inspired_by_gifts", [])
+
+        if gifts_list:
+            best_gift = run_trend_ai(gifts_list, gift_budget, "gifts")
+            cart_items["gifts"].append(best_gift)
+
+        # 🎂 Cake
+        cake_budget = budget_json.get("cake", {}).get("max_budget", budget.get("max"))
+        cake_suggestion = plan_json.get("cake_suggestion")
+        if cake_suggestion:
+            best_cake = run_trend_ai([cake_suggestion], cake_budget, "cake")
+            cart_items["cake"].append(best_cake)
+
+        # -------------------- Final response --------------------
         return jsonify({
             "plan": plan_json,
             "budget": budget_json,

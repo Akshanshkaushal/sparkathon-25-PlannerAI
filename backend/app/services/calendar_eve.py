@@ -1,5 +1,6 @@
 from flask import Flask, redirect, session, url_for, request, jsonify, render_template
 from flask_session import Session
+from flask_cors import CORS
 from google_auth_oauthlib.flow import Flow
 from app.services.credential_store import  store_user_credentials
 from app.services.calendar_utils import get_events
@@ -16,6 +17,9 @@ load_dotenv()
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY") or "dev"
 print("\U0001F511 Secret key set:", app.secret_key[:5] + "...")
+
+# Enable CORS for all routes
+CORS(app, origins=['http://localhost:5173', 'https://localhost:5173', 'http://localhost:5174', 'https://localhost:5174'], supports_credentials=True)
 
 # ✅ Session configuration
 app.config['SESSION_TYPE'] = 'filesystem'

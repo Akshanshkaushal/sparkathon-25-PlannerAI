@@ -39,7 +39,7 @@ def trigger_agent_for_event(event: dict):
     """
     # NOTE: Ensure your Flask app's host and port are correct.
     # In production, use environment variables for this URL.
-    api_url = "http://127.0.0.1:5000/api/trigger-event"
+    api_url = "https://127.0.0.1:5000/api/trigger-event"
     headers = {"Content-Type": "application/json"}
     payload = {
         "event_type": event["event_type"],
@@ -49,7 +49,7 @@ def trigger_agent_for_event(event: dict):
     
     try:
         logging.info(f"SCHEDULER: Triggering agent for event: {event['event_type']} for {event['person_name']}")
-        response = requests.post(api_url, json=payload, headers=headers)
+        response = requests.post(api_url, json=payload, headers=headers, verify=False)  # verify=False for self-signed cert
         response.raise_for_status()  # Raises an exception for 4xx or 5xx status codes
         logging.info(f"SCHEDULER: Successfully triggered agent for event_id {event.get('event_id')}. Response: {response.json()}")
     except requests.exceptions.RequestException as e:

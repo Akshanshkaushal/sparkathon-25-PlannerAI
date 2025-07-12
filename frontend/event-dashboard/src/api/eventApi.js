@@ -11,3 +11,13 @@ export const triggerEvent = async (data) => {
     throw error;
   }
 };
+
+export const updateUserPreferences = async (data) => {
+  try {
+    const response = await axios.post(`${API_URL}/user-preferences`, data);
+    return response.data;
+  } catch (error) {
+    console.error('Error updating user preferences:', error);
+    throw error;
+  }
+};

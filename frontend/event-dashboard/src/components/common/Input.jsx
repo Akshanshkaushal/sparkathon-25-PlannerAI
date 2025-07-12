@@ -1,19 +1,23 @@
+// src/components/common/Input.jsx
+
 import React from 'react';
 
-const Input = ({ label, name, value, onChange, placeholder = '', type = 'text' }) => {
+const Input = ({ label, name, value, onChange, placeholder, type = "text", required = false, className = "" }) => {
   return (
-    <div>
-      <label htmlFor={name} className="block text-sm font-medium text-text-secondary">
+    <div className={`flex flex-col ${className}`}>
+      <label htmlFor={name} className="text-xl font-semibold text-gray-800 mb-2">
         {label}
+        {required && <span className="text-red-500"> *</span>}
       </label>
       <input
-        type={type}
-        name={name}
         id={name}
+        name={name}
+        type={type}
         value={value}
         onChange={onChange}
         placeholder={placeholder}
-        className="mt-1 block w-full bg-accent border border-gray-600 rounded-md shadow-sm py-2 px-3 text-text-primary focus:outline-none focus:ring-highlight focus:border-highlight"
+        required={required}
+        className="py-5 px-6 text-lg rounded-xl border-2 border-indigo-300 shadow focus:ring-2 focus:ring-indigo-400 focus:outline-none text-gray-700 placeholder-gray-400 bg-white transition duration-150 ease-in-out"
       />
     </div>
   );

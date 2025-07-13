@@ -14,8 +14,8 @@ import {
 
 // Navigation links array to be used in both desktop and mobile menus
 const navigationLinks = [
-  { href: "#", label: "Home", active: true },
-  { href: "my-cart", label: "My Cart" },
+  { href: "/", label: "Home", active: true },
+  { href: "/my-cart", label: "My Cart" },
 ]
 
 export default function Navbar() {
@@ -79,7 +79,7 @@ export default function Navbar() {
           </Popover>
           {/* Main nav */}
           <div className="flex items-center gap-6">
-            <a href="#" className="text-primary  hover:text-primary/90">
+            <a href="/" className="text-primary  hover:text-primary/90">
               <div className="w-8 h-8 bg-[#0071dc] rounded-2xl flex items-center justify-center shadow-xl ml-4">
           <svg className="w-5 h-5 text-white drop-shadow-lg" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
@@ -107,7 +107,7 @@ export default function Navbar() {
         {/* Right side */}
         <div className="flex items-center gap-8">
           <Button asChild variant="ghost" size="lg" className="text-lg">
-            <a href="#">My cart</a>
+            <a href="/my-cart">My cart</a>
           </Button>
           <Button asChild size="lg" className="text-lg !px-4 !py-2">
             <a href="#">Connect to Calender</a>

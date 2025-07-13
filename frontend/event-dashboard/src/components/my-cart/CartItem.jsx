@@ -2,6 +2,23 @@ import React from 'react';
 import Button from '../ui/button';
 
 const CartItem = ({ item }) => {
+  // Define array of 3 placeholder images
+  const placeholderImages = [
+    "https://placeholder-image-1.com/image1.jpg",
+    "https://placeholder-image-2.com/image2.jpg", 
+    "https://placeholder-image-3.com/image3.jpg"
+  ];
+  
+  // Get a deterministic image based on some property of the item
+  // Using item id or index would be ideal, but using the title string length as a fallback
+  const getImageIndex = () => {
+    // Use modulo to ensure we get an index within our array bounds
+    return item.id ? item.id % 3 : item.title.length % 3;
+  };
+  
+  // Get the image to display
+  const displayImage = placeholderImages[getImageIndex()];
+
   const handleViewProduct = () => {
     if (item.link && item.link !== 'https://product-link.com') {
       window.open(item.link, '_blank', 'noopener,noreferrer');
@@ -28,21 +45,18 @@ const CartItem = ({ item }) => {
       </div>
       {/* Image Section */}
       <div className="w-3xs h-36 flex items-center justify-center rounded-xl mb-4 bg-gradient-to-br from-blue-50 to-indigo-100 mt-[-32px] z-0">
-        {item.image ? (
-          <img 
-            src={item.image} 
-            alt={item.title} 
-            className="w-24 h-24 object-contain rounded-xl drop-shadow-md"
-            onError={(e) => {
-              e.target.style.display = 'none';
-              e.target.nextSibling.style.display = 'flex';
-            }}
-          />
-        ) : (
-          <svg className="w-16 h-16 text-blue-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-          </svg>
-        )}
+        <img 
+          src={displayImage}
+          alt={item.title} 
+          className="w-24 h-24 object-contain rounded-xl drop-shadow-md"
+          onError={(e) => {
+            e.target.style.display = 'none';
+            e.target.nextSibling.style.display = 'flex';
+          }}
+        />
+        <svg className="w-16 h-16 text-blue-200 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+        </svg>
       </div>
       {/* Title */}
       <div className='flex flex-col justify-center items-center'>

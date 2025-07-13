@@ -6,6 +6,7 @@ import { triggerEvent, updateUserPreferences } from '../../api/eventApi';
 import { Input } from "../ui/input";
 import {Button} from '../ui/button';
 import Loader from '../common/Loader';
+import { LoaderFive, LoaderFour } from '../ui/loader';
 
 const UserForm = () => {
   const [formData, setFormData] = useState({
@@ -151,9 +152,8 @@ const UserForm = () => {
 
       <div className="flex flex-col sm:flex-row gap-2 mt-2">
         {loading ? (
-          <div className="flex items-center justify-center space-x-3 bg-[#0071dc] text-white py-6 px-8 rounded-xl w-full shadow text-lg">
-            <Loader />
-            <span className="font-medium">Processing...</span>
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-100 bg-opacity-90">
+            <LoaderFive />
           </div>
         ) : (
           <div className='flex items-center  gap-11'>

@@ -32,7 +32,7 @@ const MyCartPage = () => {
   }
 
   return (
-    <div className="fade-in">
+    <div className="fade-in py-24">
       <MyCart cartData={cartData} />
     </div>
   );

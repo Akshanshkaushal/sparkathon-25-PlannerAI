@@ -1,12 +1,15 @@
 import React from 'react';
 import Button from '../ui/button';
+import placeholder1 from '../../assets/placeholder1.jpg';
+import placeholder2 from '../../assets/placeholder2.jpg';
+import placeholder3 from '../../assets/placeholder3.jpg';
 
 const CartItem = ({ item }) => {
   // Define array of 3 placeholder images
   const placeholderImages = [
-    "https://placeholder-image-1.com/image1.jpg",
-    "https://placeholder-image-2.com/image2.jpg", 
-    "https://placeholder-image-3.com/image3.jpg"
+    placeholder1,
+    placeholder2, 
+    placeholder3
   ];
   
   // Get a deterministic image based on some property of the item
@@ -48,7 +51,7 @@ const CartItem = ({ item }) => {
         <img 
           src={displayImage}
           alt={item.title} 
-          className="w-24 h-24 object-contain rounded-xl drop-shadow-md"
+          className=" max-w-3xs max-h-36 rounded-xl drop-shadow-md"
           onError={(e) => {
             e.target.style.display = 'none';
             e.target.nextSibling.style.display = 'flex';

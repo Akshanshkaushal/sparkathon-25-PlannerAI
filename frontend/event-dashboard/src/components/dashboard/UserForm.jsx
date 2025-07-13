@@ -26,95 +26,58 @@ const UserForm = () => {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const dummyCartData = {
-    budget: {
-      cake: { max_budget: 100, min_budget: 30 },
-      decorations: { max_budget: 150, min_budget: 50 },
-      gifts: { max_budget: 200, min_budget: 100 }
-    },
-    cart: {
-      cake: [
-        {
-          isBestSeller: true,
-          link: "https://product-link.com",
-          price: { currency: "$", currentPrice: "100.00" },
-          reviewsCount: "200",
-          source: "Existing Products",
-          title: "Chocolate Molten Lava Cake"
-        }
-      ],
-      decorations: [
-        {
-          isBestSeller: false,
-          link: "https://product-link.com",
-          price: { currency: "$", currentPrice: "30.00" },
-          reviewsCount: "N/A",
-          source: "Created Suggestion",
-          title: "Decorative Quote Banners"
-        }
-      ],
-      gifts: [
-        {
-          isBestSeller: true,
-          link: "https://www.amazon.com/dp/B08N36XNTT",
-          price: { currency: "$", currentPrice: "139.99" },
-          reviewsCount: "20000",
-          source: "Existing Products",
-          title: "E-Reader (e.g., Kindle Paperwhite)"
-        }
-      ]
-    },
-    plan: {
-      cake_suggestion: {
-        size: "Two-tiered cake, serving approximately 12-15 people",
-        type: "Chocolate Molten Lava Cake"
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+    setSuccess(null);
+
+    const summary = `${formData.eventname}_${formData.username}`;
+    const data = {
+      summary,
+      preferences: formData.preferences.split(',').map(p => p.trim()),
+      budget: {
+        min: parseInt(formData.minBudget, 10),
+        max: parseInt(formData.maxBudget, 10),
+          },
+    };
+
+    try {
+      const result = await triggerEvent(data);
+      navigate('/my-cart', { state: { cartData: result } });
+    } catch (err) {
+      setError('Failed to fetch event data. Please try again.');
+    } finally {
+      setLoading(false);
+       }
+  };
+
+  const handlePreferencesSubmit = async (e) => {
+     e.preventDefault();
+    setLoading(true);
+    setError(null);
+    setSuccess(null);
+
+    const summary = `${formData.eventname}_${formData.username}`;
+    const data = {
+      summary,
+      preferences: formData.preferences.split(',').map(p => p.trim()),
+      budget: {
+        min: parseInt(formData.minBudget, 10),
+        max: parseInt(formData.maxBudget, 10),
       },
-      decoration_items: [
-        "Bookshelves with fairy lights",
-        "Gadget-themed centerpieces (like mini robots or tech gadgets)",
-        "Vintage book pages as table runners",
-        "Balloon bouquets in colors of book covers (e.g., blue, gold, red)",
-        "Quote banners featuring famous literary quotes and tech phrases"
-      ],
-      decoration_theme: "Literary Tech Wonderland",
-      gift_suggestions: {
-        inspired_by_gifts: [
-          {
-            description: "A lamp that adjusts brightness based on the time of day and can sync with reading apps, enhancing the reading experience.",
-            name: "Interactive Reading Lamp"
-          },
-          {
-            description: "A stylish bag designed to organize and store gadgets and accessories, which would appeal to anyone who loves tech and gadgets.",
-            name: "Gadget Organizer Bag"
-          }
-        ],
-        specific_gifts: [
-          {
-            description: "A portable e-reader that allows Akshansh Kaushal to carry thousands of books in one device, perfect for a book lover.",
-            name: "E-Reader (e.g., Kindle Paperwhite)"
-          },
-          {
-            description: "A voice-activated smart speaker that not only plays music but can read audiobooks and provide information, merging gadgets with books.",
-            name: "Smart Speaker (e.g., Amazon Echo)"
-          },
-          {
-            description: "A gift card to a favorite local or online bookstore, allowing Akshansh Kaushal to choose books that pique their interest.",
-            name: "Bookstore Gift Card"
-          }
-        ]
-      }
+    };
+    try {
+      await updateUserPreferences(data);
+      setSuccess('Preferences and budget updated successfully!');
+    } catch (err) {
+      setError('Failed to update preferences. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    navigate('/my-cart', { state: { cartData: dummyCartData } });
-  };
-
-  const handlePreferencesSubmit = (e) => {
-    e.preventDefault();
-    navigate('/my-cart', { state: { cartData: dummyCartData } });
-  };
+  
 
   return (
     <form onSubmit={handleSubmit} className="w-full flex flex-col gap-4">

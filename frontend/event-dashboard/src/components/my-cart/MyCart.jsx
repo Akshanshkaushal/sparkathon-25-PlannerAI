@@ -3,11 +3,25 @@ import CartItem from './CartItem';
 import { LoaderFour } from '../ui/loader';
 
 
-const MyCart = () => {
-  const [cartData, setCartData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+const MyCart = ({ cartData }) => {
+  if (!cartData) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <LoaderFour />
+      </div>
+    );
+  }
+  if (!cartData.cart) {
+    return (
+      <div className="text-center py-12">
+        <p className="text-slate-500 text-lg">No cart data available. Please generate a plan from the dashboard.</p>
+      </div>
+    );
+  }
 
+  const { cart, plan, budget } = cartData;
+  // Flatten all cart items into a single array
+  const allCartItems = Object.values(cart || {}).flat();
   // Helper function to extract gift names properly
   const extractGiftNames = (giftSuggestions) => {
     if (!giftSuggestions) return [];
@@ -27,52 +41,6 @@ const MyCart = () => {
     });
     return allGifts;
   };
-
-  useEffect(() => {
-    const fetchCartData = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        // Replace with your actual API call
-        const response = await fetch('/api/cart-data');
-        if (!response.ok) throw new Error('Failed to fetch cart data');
-        const data = await response.json();
-        setCartData(data);
-      } catch (err) {
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchCartData();
-  }, []);
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <LoaderFour />
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <p className="text-red-500 text-lg">{error}</p>
-      </div>
-    );
-  }
-
-  if (!cartData || !cartData.cart) {
-    return (
-      <div className="text-center py-12">
-        <p className="text-slate-500 text-lg">No cart data available. Please generate a plan from the dashboard.</p>
-      </div>
-    );
-  }
-
-  const { cart, plan, budget } = cartData;
-  const allCartItems = Object.values(cart || {}).flat();
 
   return (
     <div className='flex justify-center py-5'>
@@ -102,20 +70,21 @@ const MyCart = () => {
           <h2 className="text-4xl text-slate-700 font-medium mb-12 text-left tracking-tight">Event Details & Budget</h2>
           <div className="flex flex-col gap-10">
             {/* Event Items Box */}
-            <div className="bg-white rounded-3xl shadow-2xl border-2 border-[#0071dc] pl-10 md:p-16 flex flex-col min-h-[400px] max-h-[1000px] overflow-hidden mb-8">
-              <h3 className="text-4xl font-bold text-[#0071dc] mb-4 flex items-center gap-2 border-b border-blue-100 pb-2">
+            <div className="bg-white rounded-3xl shadow-2xl border-2 border-[#0071dc] pl-10 md:p-16 flex flex-col  overflow-hidden mb-8">
+              
+              <h3 className="text-3xl font-bold text-[#0071dc] mb-4 flex items-center gap-2 border-b border-blue-100 pb-2">
                 <span role="img" aria-label="gift">🎁</span> Event Items
               </h3>
               {plan ? (
-                <div className="space-y-4 text-slate-800 text-lg flex-1 overflow-y-auto pr-1">
-                  <div><span className="font-bold text-2xl text-[#0071dc]">Theme:</span> {plan.decoration_theme}</div>
+                <div className=" text-slate-800 text-xl">
+                  <div><span className="font-bold">Theme:</span> {plan.decoration_theme}</div>
                   {plan.cake_suggestion && (
-                    <div><span className="font-bold text-2xl text-[#0071dc]">Cake:</span> {plan.cake_suggestion.type}</div>
+                    <div><span className="font-bold">Cake:</span> {plan.cake_suggestion.type}</div>
                   )}
                   {plan.decoration_items?.length > 0 && (
                     <div>
-                      <span className="font-bold text-2xl text-[#0071dc]">Decor:</span>
-                      <ul className="list-disc list-inside ml-4 mt-1 text-lg">
+                      <span className="font-bold">Decor:</span>
+                      <ul className="list-disc list-inside ml-4 mt-1 text-xl">
                         {plan.decoration_items.map((item, idx) => (
                           <li key={idx}>{item}</li>
                         ))}
@@ -124,8 +93,8 @@ const MyCart = () => {
                   )}
                   {plan.gift_suggestions && (
                     <div>
-                      <span className="font-bold text-2xl text-[#0071dc]">Gifts:</span>
-                      <ul className="list-disc list-inside text-lg ml-4 mt-1 text-base">
+                      <span className="font-bold">Gifts:</span>
+                      <ul className="list-disc list-inside text-xl ml-4 mt-1">
                         {extractGiftNames(plan.gift_suggestions).map((gift, idx) => (
                           <li key={idx}>{gift}</li>
                         ))}

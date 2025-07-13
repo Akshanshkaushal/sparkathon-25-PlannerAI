@@ -36,12 +36,10 @@ const MyCart = ({ cartData }) => {
   };
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] flex flex-col items-center pt-40 pb-16">
+    <div className="min-h-screen bg-[#f8fafc] flex flex-col gap-12 items-center pt-40 pb-16">
       <div className="sticky top-0 z-40 w-full bg-[#f8fafc] pb-6">
-        <h1 className="text-5xl font-extrabold text-blue-700 tracking-tight drop-shadow-lg text-center">Your Cart</h1>
-      </div>
-      
-      {/* Cart Cards Section */}
+        <h1 className="text-5xl font-medium text-slate-700 tracking-tight drop-shadow-lg text-center">Your Cart</h1>
+          </div>
       <div className="w-full flex justify-center mb-10">
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-10 justify-items-center">
           {allCartItems.length > 0 ? (
@@ -55,17 +53,19 @@ const MyCart = ({ cartData }) => {
           )}
         </div>
       </div>
+      
+      {/* Cart Cards Section */}
       {/* Event Details Section - Full Width */}
       <div className="w-full max-w-6xl px-4 mt-10">
-        <h2 className="text-4xl font-extrabold text-blue-700 mb-8 text-center tracking-tight">Event Details & Budget</h2>
+        <h2 className="text-4xl font-semibold text-blue-700 mb-8 text-center font-primary tracking-tight">Event Details & Budget</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
           {/* Event Items Box */}
-          <div className="bg-white rounded-2xl shadow-lg border-4 border-[#0071dc] p-10 flex flex-col h-[360px]">
-            <h3 className="text-2xl font-bold text-[#0071dc] mb-6 flex items-center gap-2">
+          <div className="bg-white rounded-3xl shadow-2xl border-2 border-[#0071dc] p-6 md:p-8 flex flex-col min-h-[320px] max-h-[400px] overflow-hidden">
+            <h3 className="text-2xl font-bold text-[#0071dc] mb-4 flex items-center gap-2 border-b border-blue-100 pb-2">
               <span role="img" aria-label="gift">🎁</span> Event Items
             </h3>
             {plan ? (
-              <div className="space-y-5 text-slate-800 text-base flex-1 overflow-auto">
+              <div className="space-y-4 text-slate-800 text-base flex-1 overflow-y-auto pr-1">
                 <div><span className="font-bold text-[#0071dc]">Theme:</span> {plan.decoration_theme}</div>
                 {plan.cake_suggestion && (
                   <div><span className="font-bold text-[#0071dc]">Cake:</span> {plan.cake_suggestion.type}</div>

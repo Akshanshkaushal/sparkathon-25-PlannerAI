@@ -3,8 +3,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { triggerEvent, updateUserPreferences } from '../../api/eventApi';
-import Input from '../common/Input';
-import Button from '../common/Button';
+import { Input } from "../ui/input";
+import {Button} from '../ui/button';
 import Loader from '../common/Loader';
 
 const UserForm = () => {
@@ -26,63 +26,102 @@ const UserForm = () => {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setError(null);
-    setSuccess(null);
-
-    const summary = `${formData.eventname}_${formData.username}`;
-    const data = {
-      summary,
-      preferences: formData.preferences.split(',').map(p => p.trim()),
-      budget: {
-        min: parseInt(formData.minBudget, 10),
-        max: parseInt(formData.maxBudget, 10),
+  const dummyCartData = {
+    budget: {
+      cake: { max_budget: 100, min_budget: 30 },
+      decorations: { max_budget: 150, min_budget: 50 },
+      gifts: { max_budget: 200, min_budget: 100 }
+    },
+    cart: {
+      cake: [
+        {
+          isBestSeller: true,
+          link: "https://product-link.com",
+          price: { currency: "$", currentPrice: "100.00" },
+          reviewsCount: "200",
+          source: "Existing Products",
+          title: "Chocolate Molten Lava Cake"
+        }
+      ],
+      decorations: [
+        {
+          isBestSeller: false,
+          link: "https://product-link.com",
+          price: { currency: "$", currentPrice: "30.00" },
+          reviewsCount: "N/A",
+          source: "Created Suggestion",
+          title: "Decorative Quote Banners"
+        }
+      ],
+      gifts: [
+        {
+          isBestSeller: true,
+          link: "https://www.amazon.com/dp/B08N36XNTT",
+          price: { currency: "$", currentPrice: "139.99" },
+          reviewsCount: "20000",
+          source: "Existing Products",
+          title: "E-Reader (e.g., Kindle Paperwhite)"
+        }
+      ]
+    },
+    plan: {
+      cake_suggestion: {
+        size: "Two-tiered cake, serving approximately 12-15 people",
+        type: "Chocolate Molten Lava Cake"
       },
-    };
-
-    try {
-      const result = await triggerEvent(data);
-      navigate('/my-cart', { state: { cartData: result } });
-    } catch (err) {
-      setError('Failed to fetch event data. Please try again.');
-    } finally {
-      setLoading(false);
+      decoration_items: [
+        "Bookshelves with fairy lights",
+        "Gadget-themed centerpieces (like mini robots or tech gadgets)",
+        "Vintage book pages as table runners",
+        "Balloon bouquets in colors of book covers (e.g., blue, gold, red)",
+        "Quote banners featuring famous literary quotes and tech phrases"
+      ],
+      decoration_theme: "Literary Tech Wonderland",
+      gift_suggestions: {
+        inspired_by_gifts: [
+          {
+            description: "A lamp that adjusts brightness based on the time of day and can sync with reading apps, enhancing the reading experience.",
+            name: "Interactive Reading Lamp"
+          },
+          {
+            description: "A stylish bag designed to organize and store gadgets and accessories, which would appeal to anyone who loves tech and gadgets.",
+            name: "Gadget Organizer Bag"
+          }
+        ],
+        specific_gifts: [
+          {
+            description: "A portable e-reader that allows Akshansh Kaushal to carry thousands of books in one device, perfect for a book lover.",
+            name: "E-Reader (e.g., Kindle Paperwhite)"
+          },
+          {
+            description: "A voice-activated smart speaker that not only plays music but can read audiobooks and provide information, merging gadgets with books.",
+            name: "Smart Speaker (e.g., Amazon Echo)"
+          },
+          {
+            description: "A gift card to a favorite local or online bookstore, allowing Akshansh Kaushal to choose books that pique their interest.",
+            name: "Bookstore Gift Card"
+          }
+        ]
+      }
     }
   };
 
-  const handlePreferencesSubmit = async (e) => {
+  const handleSubmit = (e) => {
     e.preventDefault();
-    setLoading(true);
-    setError(null);
-    setSuccess(null);
+    navigate('/my-cart', { state: { cartData: dummyCartData } });
+  };
 
-    const summary = `${formData.eventname}_${formData.username}`;
-    const data = {
-      summary,
-      preferences: formData.preferences.split(',').map(p => p.trim()),
-      budget: {
-        min: parseInt(formData.minBudget, 10),
-        max: parseInt(formData.maxBudget, 10),
-      },
-    };
-
-    try {
-      await updateUserPreferences(data);
-      setSuccess('Preferences and budget updated successfully!');
-    } catch (err) {
-      setError('Failed to update preferences. Please try again.');
-    } finally {
-      setLoading(false);
-    }
+  const handlePreferencesSubmit = (e) => {
+    e.preventDefault();
+    navigate('/my-cart', { state: { cartData: dummyCartData } });
   };
 
   return (
     <form onSubmit={handleSubmit} className="w-full flex flex-col gap-4">
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className="grid  grid-cols-1 sm:grid-cols-2 gap-4">
         <Input
           label="Username (Email)"
+          labelClassName="text-blue-600"
           name="username"
           value={formData.username}
           onChange={handleChange}
@@ -154,20 +193,20 @@ const UserForm = () => {
             <span className="font-medium">Processing...</span>
           </div>
         ) : (
-          <>
-            <Button type="submit" className="w-full mb-4">
+          <div className='flex items-center  gap-11'>
+            <Button type="submit" className="w-full mb-3">
               <svg className="w-6 h-6 mr-3 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
               </svg>
               Generate Event Plan
             </Button>
-            <Button type="button" onClick={handlePreferencesSubmit} className="w-full">
+            <Button type="button" onClick={handlePreferencesSubmit} className="w-full mt-1">
               <svg className="w-6 h-6 mr-3 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
               Save Preferences Only
             </Button>
-          </>
+          </div>
         )}
       </div>
 

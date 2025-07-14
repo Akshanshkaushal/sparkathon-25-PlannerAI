@@ -17,7 +17,7 @@ const CartItem = ({ item, index = 0 }) => {
     if (item.title) {
       if (item.title.includes('Chocolate') || item.title.includes('Cake') || item.title.includes('Literary')) {
         return 0; // First placeholder for anything with "Chocolate", "Cake" or "Literary"
-      } else if (item.title.includes('Fairy') || item.title.includes('lights')) {
+      } else if (item.title.includes('Fairy') || item.title.includes('lights') || item.title.includes('lighting') || item.title.includes('vintage') || item.title.includes('Vintage') || item.title.includes('lanterns')) {
         return 2; // Second placeholder for "Fairy lights"
       } else if (item.title.includes('Book') || item.title.includes('Gift Card')) {
         return 1; // Third placeholder for "Bookstore Gift Card"

@@ -1,10 +1,10 @@
 import React from 'react';
 import Button from '../ui/button';
 import placeholder1 from '../../assets/placeholder1.jpg';
-import placeholder2 from '../../assets/placeholder2.jpg';
-import placeholder3 from '../../assets/placeholder3.jpg';
+import placeholder2 from '../../assets/placeholder2.jpeg';
+import placeholder3 from '../../assets/placeholder3.jpeg';
 
-const CartItem = ({ item }) => {
+const CartItem = ({ item, index = 0 }) => {
   // Define array of 3 placeholder images
   const placeholderImages = [
     placeholder1,
@@ -12,11 +12,30 @@ const CartItem = ({ item }) => {
     placeholder3
   ];
   
-  // Get a deterministic image based on some property of the item
-  // Using item id or index would be ideal, but using the title string length as a fallback
+  // Get image based on the item's title content
   const getImageIndex = () => {
-    // Use modulo to ensure we get an index within our array bounds
-    return item.id ? item.id % 3 : item.title.length % 3;
+    if (item.title) {
+      if (item.title.includes('Chocolate') || item.title.includes('Cake') || item.title.includes('Literary')) {
+        return 0; // First placeholder for anything with "Chocolate", "Cake" or "Literary"
+      } else if (item.title.includes('Fairy') || item.title.includes('lights')) {
+        return 2; // Second placeholder for "Fairy lights"
+      } else if (item.title.includes('Book') || item.title.includes('Gift Card')) {
+        return 1; // Third placeholder for "Bookstore Gift Card"
+      }
+    }
+    
+    // If no specific match, fall back to index-based assignment
+    if (index !== undefined) {
+      return index % placeholderImages.length;
+    }
+    
+    // Fallback if index isn't provided
+    if (item.id !== undefined) {
+      return (item.id - 1) % placeholderImages.length;
+    }
+    
+    // Final fallback
+    return 0;
   };
   
   // Get the image to display
@@ -29,9 +48,6 @@ const CartItem = ({ item }) => {
       alert('This is a demo product. In a real application, this would link to the actual product page.');
     }
   };
-
-  // Card states: you can pass props for disabled, focused, etc. if needed
-  // For now, just show normal/hover/active
 
   return (
     <div

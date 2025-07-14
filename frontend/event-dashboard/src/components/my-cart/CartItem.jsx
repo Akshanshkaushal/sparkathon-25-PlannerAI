@@ -51,23 +51,25 @@ const CartItem = ({ item, index = 0 }) => {
 
   return (
     <div
-      className="relative bg-white rounded-3xl shadow-lg flex flex-col gap-2 items-center h-full transition-all duration-200 border-2 border-transparent hover:border-blue-400 focus-within:border-blue-500 active:border-blue-600 group"
+      className="relative bg-white rounded-3xl overflow-hidden shadow-xl hover:shadow-2xl flex flex-col gap-2 items-center h-full transition-all duration-300 border border-gray-100 hover:border-blue-400 focus-within:border-blue-500 active:border-blue-600 group transform hover:-translate-y-1"
       tabIndex={0}
     >
-      {/* Blue Header */}
-      <div className="w-full h-16 rounded-t-2xl  flex items-center justify-between px-4 mb-[-32px] z-10">
-        {/* Label/Badge */}
-        <span className="badge badge-new bg-white/80 text-[#0071dc] font-bold px-3 py-1 rounded-full text-xs shadow-md">
-          {item.isBestSeller ? 'Best Seller' : 'Recommended'}
+      {/* Accent top bar with gradient */}
+      <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-blue-500 to-indigo-600"></div>
+      
+      {/* Badge Overlay - positioned absolutely */}
+      <div className="absolute top-4 left-4 z-20">
+        <span className="badge badge-new bg-white/90 backdrop-blur-sm text-blue-600 font-medium px-3 py-1.5 rounded-full text-xs shadow-md border border-blue-100">
+          {item.isBestSeller ? '⭐ Best Seller' : '🔥 Recommended'}
         </span>
-        {/* Optionally, add more icons or actions here */}
       </div>
-      {/* Image Section */}
-      <div className="w-3xs h-36 flex items-center justify-center rounded-xl mb-4 bg-gradient-to-br from-blue-50 to-indigo-100 mt-[-32px] z-0">
+      
+      {/* Image Section - made larger and more prominent */}
+      <div className="w-full h-48 flex items-center justify-center bg-gradient-to-br from-blue-50/70 to-indigo-50/70 mt-0 mb-2 overflow-hidden">
         <img 
           src={displayImage}
           alt={item.title} 
-          className=" max-w-3xs max-h-36 rounded-xl drop-shadow-md"
+          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
           onError={(e) => {
             e.target.style.display = 'none';
             e.target.nextSibling.style.display = 'flex';
@@ -77,34 +79,38 @@ const CartItem = ({ item, index = 0 }) => {
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
         </svg>
       </div>
-      {/* Title */}
-      <div className='flex flex-col justify-center items-center'>
 
-      <h3 className="text-lg font-bold text-slate-800 mb-1 text-center line-clamp-2">
-        {item.title}
-      </h3>
-      {/* Description */}
-      <p className="text-gray-500 text-sm mb-4 text-center line-clamp-2">
-        {item.description || item.source || 'No description available.'}
-      </p>
-      {/* Price */}
-      <div className="text-[#0071dc] font-medium text-base ">
-        {item.price && item.price.currency}{item.price && item.price.currentPrice}
+      {/* Content container with padding */}
+      <div className='flex flex-col justify-center items-center px-5 py-3'>
+        {/* Title with improved typography */}
+        <h3 className="text-xl font-bold text-slate-800 mb-2 text-center line-clamp-2 tracking-tight">
+          {item.title}
+        </h3>
+        
+        {/* Description with better spacing */}
+        <p className="text-gray-500 text-sm mb-4 text-center line-clamp-2 leading-relaxed">
+          {item.description || item.source || 'No description available.'}
+        </p>
+        
+        {/* Price with enhanced styling */}
+        <div className="text-blue-600 font-semibold text-lg mb-3">
+          {item.price && item.price.currency}{item.price && item.price.currentPrice}
+        </div>
       </div>
-      </div>
-      {/* Action Buttons */}
-      <div className="w-full mt-2 flex py-8 justify-center gap-8 space-y-8">
+      
+      {/* Action Buttons - improved layout and styling */}
+      <div className="w-full mt-auto px-4 pb-5 pt-0 flex justify-center gap-3">
         <Button
           onClick={handleViewProduct}
-          className="w-32 text-sm py-16"
+          className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 rounded-lg shadow-md transition-colors text-sm flex items-center justify-center"
         >
-          <svg className="w-4 h-4 x mr-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
           </svg>
-          View Product
+          View Details
         </Button>
-        <button className="w-32 bg-blue-100 hover:bg-blue-200 text-[#0071dc] font-semibold py-2 rounded-lg shadow transition text-sm">
-          <svg className="w-4 h-4 mr-2 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <button className="flex-1 bg-blue-50 hover:bg-blue-100 text-blue-600 font-medium py-2.5 rounded-lg shadow-sm transition-colors text-sm flex items-center justify-center">
+          <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4m0 0L7 13m0 0l-2.5 5M7 13l2.5 5m6-5v6a2 2 0 01-2 2H9a2 2 0 01-2-2v-6m8 0V9a2 2 0 00-2-2H9a2 2 0 00-2 2v4.01" />
           </svg>
           Add to Cart

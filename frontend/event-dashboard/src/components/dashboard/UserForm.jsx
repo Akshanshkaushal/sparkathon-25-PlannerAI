@@ -12,6 +12,8 @@ const UserForm = () => {
   const [formData, setFormData] = useState({
     username: '',
     eventname: '',
+    birthdayDate: '',
+    relationship: '',
     preferences: '',
     minBudget: '',
     maxBudget: '',
@@ -41,6 +43,10 @@ const UserForm = () => {
         min: parseInt(formData.minBudget, 10),
         max: parseInt(formData.maxBudget, 10),
           },
+      user_name: formData.username,
+      birthday_date: formData.birthdayDate,
+      event_date: formData.birthdayDate,
+      relationship: formData.relationship,
     };
 
     try {
@@ -67,6 +73,10 @@ const UserForm = () => {
         min: parseInt(formData.minBudget, 10),
         max: parseInt(formData.maxBudget, 10),
       },
+      user_name: formData.username,
+      birthday_date: formData.birthdayDate,
+      event_date: formData.birthdayDate,
+      relationship: formData.relationship,
     };
     try {
       await updateUserPreferences(data);
@@ -84,12 +94,12 @@ const UserForm = () => {
     <form onSubmit={handleSubmit} className="w-full flex flex-col gap-4">
       <div className="grid  grid-cols-1 sm:grid-cols-2 gap-4">
         <Input
-          label="Username (Email)"
+          label="Recipient Name or Email"
           labelClassName="text-blue-600"
           name="username"
           value={formData.username}
           onChange={handleChange}
-          placeholder="username@example.com"
+          placeholder="Akshansh or username@example.com"
           required
         />
         <Input
@@ -99,6 +109,24 @@ const UserForm = () => {
           onChange={handleChange}
           placeholder="Birthday, Wedding, etc."
           required
+        />
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <Input
+          label="Birthday / Event Date"
+          name="birthdayDate"
+          type="date"
+          value={formData.birthdayDate}
+          onChange={handleChange}
+          required
+        />
+        <Input
+          label="Relationship"
+          name="relationship"
+          value={formData.relationship}
+          onChange={handleChange}
+          placeholder="friend, sibling, partner, colleague"
         />
       </div>
 

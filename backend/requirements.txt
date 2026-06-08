@@ -1,6 +1,7 @@
 Flask
 python-dotenv
 langchain
+langchain-core
 langchain-openai
 pymongo
 requests

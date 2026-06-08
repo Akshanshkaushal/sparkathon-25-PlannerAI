@@ -17,7 +17,7 @@ def search_walmart_product(query: str) -> list[dict]:
     structured product data. This function is designed to be used as a tool by an agent.
     """
     if not WALMART_API_KEY or not WALMART_API_HOST:
-        logger.error("Walmart API Key or Host is not configured in environment variables.")
+        logger.info("Walmart API key is not configured; product discovery will use fallback sources.")
         return []
 
     url = f"https://{WALMART_API_HOST}/search"

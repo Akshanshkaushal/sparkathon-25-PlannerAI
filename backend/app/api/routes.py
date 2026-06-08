@@ -1,167 +1,169 @@
-from flask import Blueprint, jsonify, request
-from app.agents.goal_agent import get_goal_agent_chain
-from app.agents.budget_agent import get_budget_agent_chain
-from app.agents.trend_agent import run_trend_ai  # Changed from create_trend_agent_executor
-from app.services.db_service import db_service
-import json
 import logging
-import re
-from datetime import datetime
+from datetime import datetime, timedelta
 
-api_bp = Blueprint('api_bp', __name__)
+from flask import Blueprint, jsonify, request
+
+from app.agents.gift_planner_agent import GiftPlannerAgent
+from app.services.db_service import db_service
+
+api_bp = Blueprint("api_bp", __name__)
 logger = logging.getLogger(__name__)
+gift_planner = GiftPlannerAgent(db_service)
 
 
 def extract_event_name(summary: str) -> str:
     if "_" in summary:
-        return summary.split("_")[0].lower()
+        return summary.split("_", 1)[0].lower()
     return summary.lower()
 
 
-def extract_json_from_text(raw_text: str) -> str:
-    """
-    Extract JSON from text that might be wrapped in markdown fences like ```json ... ```
-    """
-    # remove code block fences
-    code_fence_pattern = r"```(?:json)?\s*(.*?)```"
-    match = re.search(code_fence_pattern, raw_text, re.DOTALL)
-    if match:
-        return match.group(1).strip()
-    return raw_text.strip()
+def extract_recipient_name(summary: str) -> str:
+    if "_" in summary:
+        return summary.split("_", 1)[1].replace("-", " ").strip()
+    return summary
 
 
-def try_parse_json(raw_text, context=""):
-    """
-    Safely attempts to parse JSON string. Cleans fenced code blocks first.
-    """
-    clean_text = extract_json_from_text(raw_text)
-    try:
-        return json.loads(clean_text)
-    except json.JSONDecodeError:
-        logger.error(f"❌ Failed to parse JSON from {context}. Raw cleaned text was:\n{clean_text}")
-        raise
+def _payload_for_preferences(data: dict, summary: str) -> dict:
+    payload = {}
+    for key in ("preferences", "budget", "birthday_date", "event_date", "relationship", "user_name"):
+        if data.get(key) is not None:
+            payload[key] = data.get(key)
+
+    payload["event_name"] = extract_event_name(summary)
+    payload["last_updated"] = datetime.utcnow().isoformat()
+    return payload
 
 
-@api_bp.route('/user-preferences', methods=['POST'])
+@api_bp.route("/user-preferences", methods=["POST"])
 def update_user_preferences():
-    data = request.json
-    summary = data.get('summary')
-    preferences = data.get('preferences')
-    budget = data.get('budget')
-
+    data = request.get_json(silent=True) or {}
+    summary = data.get("summary")
     if not summary:
         return jsonify({"error": "The 'summary' field is required."}), 400
 
     try:
-        update_data = {}
-        if preferences is not None:
-            update_data['preferences'] = preferences
-        if budget is not None:
-            update_data['budget'] = budget
-
-        event_name = extract_event_name(summary)
-        update_data['event_name'] = event_name
-        update_data['last_updated'] = datetime.utcnow().isoformat()
-
-        db_service.create_or_update_event_user(summary, update_data)
-
-        return jsonify({
-            "status": "success",
-            "message": f"Preferences for {summary} updated.",
-            "event_name": event_name
-        }), 200
-
-    except Exception as e:
-        logger.exception(f"Error updating user preferences for {summary}")
-        return jsonify({"error": "Internal server error", "details": str(e)}), 500
+        update_payload = _payload_for_preferences(data, summary)
+        db_service.create_or_update_event_user(summary, update_payload)
+        return jsonify(
+            {
+                "status": "success",
+                "message": f"Preferences for {summary} updated.",
+                "event_name": update_payload["event_name"],
+            }
+        ), 200
+    except Exception as exc:
+        logger.exception("Error updating user preferences for %s", summary)
+        return jsonify({"error": "Internal server error", "details": str(exc)}), 500
 
 
-@api_bp.route('/trigger-event', methods=['POST'])
+@api_bp.route("/trigger-event", methods=["POST"])
 def trigger_event():
-    data = request.json
-    summary = data.get('summary')
+    data = request.get_json(silent=True) or {}
+    summary = data.get("summary")
     if not summary:
         return jsonify({"error": "Missing 'summary' field."}), 400
 
-    event_name = extract_event_name(summary)
+    event_name = data.get("event_name") or extract_event_name(summary)
 
     try:
-        # -------------------- User data --------------------
         user_data = db_service.get_user_by_summary(summary) or {}
-        preferences = data.get('preferences') or user_data.get('preferences', ["books", "gadgets"])
-        budget = data.get('budget') or user_data.get('budget', {"min": 100, "max": 500})
-        user_name = data.get('user_name') or user_data.get('user_name', summary.split('@')[0])
+        preferences = data.get("preferences") or user_data.get("preferences", ["books", "gadgets"])
+        budget = data.get("budget") or user_data.get("budget", {"min": 100, "max": 500})
+        user_name = (
+            data.get("user_name")
+            or user_data.get("user_name")
+            or extract_recipient_name(summary)
+        )
 
-        update_payload = {
+        profile_payload = {
             "user_name": user_name,
             "preferences": preferences,
             "budget": budget,
             "event_name": event_name,
-            "last_updated": datetime.utcnow().isoformat()
+            "birthday_date": data.get("birthday_date") or user_data.get("birthday_date"),
+            "event_date": data.get("event_date") or user_data.get("event_date"),
+            "relationship": data.get("relationship") or user_data.get("relationship"),
+            "last_updated": datetime.utcnow().isoformat(),
         }
-        db_service.create_or_update_event_user(summary, update_payload)
+        db_service.create_or_update_event_user(summary, profile_payload)
 
-        # -------------------- Agents --------------------
-        goal_chain = get_goal_agent_chain()
-        plan_result = goal_chain.invoke({
-            "event_type": event_name,
-            "person_name": user_name,
-            "user_preferences": str(preferences)
-        })
+        result = gift_planner.build_event_plan(
+            summary=summary,
+            event_type=event_name,
+            person_name=user_name,
+            preferences=preferences,
+            budget=budget,
+        )
+        db_service.save_agent_run(summary, result)
+        db_service.create_or_update_event_user(
+            summary,
+            {
+                "last_agent_result": result,
+                "last_agent_run_at": result["generated_at"],
+                "notification": result["notification"],
+            },
+        )
 
-        logger.info(f"📝 Planner agent output:\n{plan_result}")
-        plan_json = try_parse_json(plan_result.get('text', ''), context="Planner Agent")
+        return jsonify(result), 200
+    except Exception as exc:
+        logger.exception("Error in /trigger-event for summary %s", summary)
+        return jsonify({"error": "Internal server error", "details": str(exc)}), 500
 
-        budget_chain = get_budget_agent_chain()
-        budget_result = budget_chain.invoke({
-            "spending_tier": budget,
-            "event_plan_json": json.dumps(plan_json)
-        })
 
-        logger.info(f"💵 Budget agent output:\n{budget_result}")
-        budget_json = try_parse_json(budget_result.get('text', ''), context="Budget Agent")
+@api_bp.route("/agent-runs/<path:summary>/latest", methods=["GET"])
+def latest_agent_run(summary):
+    try:
+        run = db_service.get_latest_agent_run(summary)
+        if not run:
+            return jsonify({"error": "No agent run found."}), 404
+        return jsonify(run), 200
+    except Exception as exc:
+        logger.exception("Error loading latest agent run for %s", summary)
+        return jsonify({"error": "Internal server error", "details": str(exc)}), 500
 
-        # -------------------- Trend shopping: build full cart --------------------
-        cart_items = {
-            "decorations": [],
-            "gifts": [],
-            "cake": []
-        }
 
-        # 🎈 Decorations
-        decoration_budget = budget_json.get("decorations", {}).get("max_budget", budget.get("max"))
-        decoration_items = plan_json.get("decoration_items", [])
-        if decoration_items:
-            best_decor = run_trend_ai(decoration_items, decoration_budget, "decorations")
-            cart_items["decorations"].append(best_decor)
+@api_bp.route("/birthdays/due", methods=["GET"])
+def due_birthdays():
+    """Return recipients with birthdays/events in the next N days for notification UIs."""
+    try:
+        days = max(1, min(int(request.args.get("days", 7)), 365))
+    except ValueError:
+        return jsonify({"error": "'days' must be a number between 1 and 365."}), 400
 
-        # 🎁 Gifts
-        gift_budget = budget_json.get("gifts", {}).get("max_budget", budget.get("max"))
-        gift_suggestions = plan_json.get("gift_suggestions", {})
+    today = datetime.utcnow().date()
+    end_date = today + timedelta(days=days)
 
-        # combine both inspired_by_gifts and specific_gifts into a flat list
-        gifts_list = []
-        gifts_list += gift_suggestions.get("specific_gifts", [])
-        gifts_list += gift_suggestions.get("inspired_by_gifts", [])
+    due = []
+    for summary in db_service.list_all_summaries():
+        user = db_service.get_user_by_summary(summary) or {}
+        date_text = user.get("birthday_date") or user.get("event_date")
+        if not date_text:
+            continue
+        try:
+            parsed = datetime.fromisoformat(str(date_text).replace("Z", "+00:00")).date()
+        except ValueError:
+            continue
 
-        if gifts_list:
-            best_gift = run_trend_ai(gifts_list, gift_budget, "gifts")
-            cart_items["gifts"].append(best_gift)
+        try:
+            anniversary = parsed.replace(year=today.year)
+        except ValueError:
+            anniversary = parsed.replace(year=today.year, day=28)
+        if anniversary < today:
+            try:
+                anniversary = anniversary.replace(year=today.year + 1)
+            except ValueError:
+                anniversary = anniversary.replace(year=today.year + 1, day=28)
 
-        # 🎂 Cake
-        cake_budget = budget_json.get("cake", {}).get("max_budget", budget.get("max"))
-        cake_suggestion = plan_json.get("cake_suggestion")
-        if cake_suggestion:
-            best_cake = run_trend_ai([cake_suggestion], cake_budget, "cake")
-            cart_items["cake"].append(best_cake)
+        if today <= anniversary <= end_date:
+            due.append(
+                {
+                    "summary": summary,
+                    "user_name": user.get("user_name") or extract_recipient_name(summary),
+                    "event_name": user.get("event_name") or extract_event_name(summary),
+                    "date": anniversary.isoformat(),
+                    "notification": user.get("notification")
+                    or f"{summary} has an upcoming celebration. Generate a gift plan.",
+                }
+            )
 
-        # -------------------- Final response --------------------
-        return jsonify({
-            "plan": plan_json,
-            "budget": budget_json,
-            "cart": cart_items
-        }), 200
-
-    except Exception as e:
-        logger.exception("Error in /trigger-event")
-        return jsonify({"error": "Internal server error", "details": str(e)}), 500
+    return jsonify({"days": days, "events": due}), 200

@@ -1,38 +1,40 @@
-import os
 import logging
-from pymongo import MongoClient, ASCENDING
-from pymongo.errors import ConnectionFailure
+import os
 from datetime import datetime
 
+from pymongo import ASCENDING, MongoClient
+from pymongo.errors import ConnectionFailure
+
 logger = logging.getLogger(__name__)
+
 
 class DBService:
     def __init__(self):
         try:
             mongo_uri = os.environ.get("MONGO_URI", "mongodb://localhost:27017/")
             self.client = MongoClient(mongo_uri)
-            self.client.admin.command('ping')  # Check connection
+            self.client.admin.command("ping")
             self.db = self.client.get_database("planner_ai")
             self.parsed_events = self.db.parsed_events
+            self.agent_runs = self.db.agent_runs
 
-            # Ensure unique index on summary (used as unique ID now)
             indexes = self.parsed_events.index_information()
-            if 'summary_1' not in indexes:
+            if "summary_1" not in indexes:
                 self.parsed_events.create_index([("summary", ASCENDING)], unique=True)
+            self.agent_runs.create_index([("summary", ASCENDING), ("generated_at", ASCENDING)])
 
-            logger.info("✅ Connected to MongoDB and ensured index on summary.")
-        except ConnectionFailure as e:
-            logger.error(f"❌ Could not connect to MongoDB: {e}")
+            logger.info("Connected to MongoDB and ensured planner indexes.")
+        except ConnectionFailure as exc:
+            logger.error("Could not connect to MongoDB: %s", exc)
             raise
-        except Exception as e:
-            logger.error(f"❌ Initialization error: {e}")
+        except Exception as exc:
+            logger.error("Initialization error: %s", exc)
             raise
 
     def create_or_update_event_user(self, summary: str, data_to_update: dict):
         if not summary:
-            raise ValueError("Summary (used as ID) is required.")
+            raise ValueError("Summary is required.")
 
-        # Always update summary field
         data_to_update["summary"] = summary
         data_to_update["last_updated"] = datetime.utcnow().isoformat()
 
@@ -40,80 +42,78 @@ class DBService:
             result = self.parsed_events.update_one(
                 {"summary": summary},
                 {"$set": data_to_update, "$setOnInsert": {"created_at": datetime.utcnow()}},
-                upsert=True
+                upsert=True,
             )
             if result.upserted_id:
-                logger.info(f"✅ Created new document for summary: {summary}")
+                logger.info("Created new document for summary: %s", summary)
             elif result.modified_count > 0:
-                logger.info(f"✅ Updated existing document for summary: {summary}")
+                logger.info("Updated existing document for summary: %s", summary)
             else:
-                logger.info(f"ℹ️ No changes made for summary: {summary}")
+                logger.info("No changes made for summary: %s", summary)
             return result
-        except Exception as e:
-            logger.error(f"❌ Failed to update document for summary: {summary}, Error: {e}")
+        except Exception:
+            logger.exception("Failed to update document for summary: %s", summary)
             raise
 
     def get_user_by_summary(self, summary: str):
         try:
             return self.parsed_events.find_one({"summary": summary})
-        except Exception as e:
-            logger.error(f"❌ Could not fetch user by summary {summary}: {e}")
+        except Exception:
+            logger.exception("Could not fetch user by summary: %s", summary)
             raise
 
     def list_all_summaries(self):
         try:
             cursor = self.parsed_events.find({}, {"summary": 1, "_id": 0})
             return [doc.get("summary") for doc in cursor]
-        except Exception as e:
-            logger.error("❌ Failed to list summaries")
+        except Exception:
+            logger.exception("Failed to list summaries")
             return []
 
-# Singleton
+    def save_agent_run(self, summary: str, result: dict):
+        if not summary:
+            raise ValueError("Summary is required.")
+        return self.agent_runs.insert_one(
+            {
+                "summary": summary,
+                "generated_at": datetime.utcnow().isoformat(),
+                "result": result,
+            }
+        )
+
+    def get_latest_agent_run(self, summary: str):
+        return self.agent_runs.find_one(
+            {"summary": summary},
+            {"_id": 0},
+            sort=[("generated_at", -1)],
+        )
+
+
 db_service = DBService()
 
-# Add the missing functions that are imported in routes.py
+
 def get_user_preferences(user_name):
-    """
-    Retrieve user preferences from the database.
-    
-    Args:
-        user_name: The name of the user whose preferences to retrieve.
-        
-    Returns:
-        A dictionary of user preferences or empty dict if none found.
-    """
     try:
-        db = db_service.db
-        user_prefs = db.user_preferences.find_one({"user_name": user_name})
+        user_prefs = db_service.db.user_preferences.find_one({"user_name": user_name})
         if user_prefs:
             return user_prefs.get("preferences", {})
-        else:
-            logger.warning(f"No preferences found for user: {user_name}")
-            return {}
-    except Exception as e:
-        logger.error(f"Error retrieving preferences for {user_name}: {e}")
+
+        logger.warning("No preferences found for user: %s", user_name)
+        return {}
+    except Exception:
+        logger.exception("Error retrieving preferences for user: %s", user_name)
         return {}
 
+
 def add_user_preference(user_name, preferences):
-    """
-    Add or update user preferences in the database.
-    
-    Args:
-        user_name: The name of the user to update preferences for.
-        preferences: The preferences data to store.
-        
-    Returns:
-        The result of the database operation.
-    """
     try:
-        db = db_service.db
-        result = db.user_preferences.update_one(
+        result = db_service.db.user_preferences.update_one(
             {"user_name": user_name},
             {"$set": {"preferences": preferences, "updated_at": datetime.utcnow()}},
-            upsert=True
+            upsert=True,
         )
-        logger.info(f"Updated preferences for user {user_name}")
+        logger.info("Updated preferences for user: %s", user_name)
         return result
-    except Exception as e:
-        logger.error(f"Error adding preferences for {user_name}: {e}")
+    except Exception:
+        logger.exception("Error adding preferences for user: %s", user_name)
         raise
